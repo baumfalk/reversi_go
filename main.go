@@ -44,28 +44,15 @@ func main() {
 	for gameDone := false; !gameDone; {
 		legalMoveBoard, legalMoveCount := game.GenerateLegalMoves(board, curPlayer)
 		if legalMoveCount == 0 {
-			passes++
-			fmt.Println("No possible options for player", curPlayer, ", passing")
-			curPlayer = 3 - curPlayer
-
-			if passes == 2 {
-				gameDone = true
-				fmt.Println("Game over, determining winner!")
-			}
+			game.HandlePass(&passes, &curPlayer, &gameDone)
 			continue
 		}
 		passes = 0
 		game.PrintBoard(board, legalMoveBoard)
 		printInfo(curPlayer)
 		y, x := getCoordinates(scanner, boardSize)
-		legalMove, reason, changes := game.IsLegalMove(y, x, board, curPlayer)
 
-		if legalMove {
-			game.ChangeBoard(y, x, board, changes, curPlayer)
-			curPlayer = 3 - curPlayer
-		} else {
-			fmt.Println("This (", y, ", ", x, ") is not a legal move:", reason)
-		}
+		game.HandleMove(&y, &x, &legalMoveBoard, &curPlayer, &board)
 	}
 
 	winner := game.DetermineWinner(board)

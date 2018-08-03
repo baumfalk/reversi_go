@@ -19,7 +19,6 @@ func NewReversiBoard(size int) [][]int {
 	for i := 0; i < size; i++ {
 		board[i] = make([]int, size, size)
 	}
-	color.Cyan("Prints text in cyan.")
 
 	for i := 0; i < size; i++ {
 		for j := 0; j < size; j++ {
@@ -39,7 +38,7 @@ func NewReversiBoard(size int) [][]int {
    To print a reversi board
 */
 
-func PrintBoard(board [][]int, legalMoveBoard [][]bool) {
+func PrintBoard(board [][]int, legalMoveBoard [][][]Point) {
 
 	fmt.Print("  ")
 	for i := range board {
@@ -59,7 +58,7 @@ func PrintBoard(board [][]int, legalMoveBoard [][]bool) {
 				color.Set(color.BgWhite)
 				fmt.Print("O")
 				color.Unset()
-			} else if legalMoveBoard[y][x] {
+			} else if legalMoveBoard[y][x] != nil {
 				color.Set(color.BgWhite)
 				fmt.Print("*")
 				color.Unset()
@@ -128,15 +127,18 @@ func diagonallyLegal(y int, x int, board [][]int, curPlayer int) (bool, []Point)
 	return t2bl2r || t2br2l || b2tl2r || b2tr2l, totalList
 }
 
-func GenerateLegalMoves(board [][]int, curPlayer int) ([][]bool, int) {
-	legalMoveBoard := make([][]bool, len(board), len(board))
+func GenerateLegalMoves(board [][]int, curPlayer int) ([][][]Point, int) {
+	legalMoveBoard := make([][][]Point, len(board), len(board))
+
 	legalMoveCount := 0
+
 	for y, row := range board {
-		legalMoveBoard[y] = make([]bool, len(board[y]), len(board[y]))
+		legalMoveBoard[y] = make([][]Point, len(board[y]), len(board[y]))
 
 		for x := range row {
-			legalMoveBoard[y][x], _, _ = IsLegalMove(y, x, board, curPlayer)
-			if legalMoveBoard[y][x] {
+			legal, _, changes := IsLegalMove(y, x, board, curPlayer)
+			legalMoveBoard[y][x] = changes
+			if legal {
 				legalMoveCount++
 			}
 		}
@@ -168,6 +170,17 @@ func ChangeBoard(y int, x int, board [][]int, changedCells []Point, curPlayer in
 	board[y][x] = curPlayer
 }
 
+func HandlePass(passes *int, curPlayer *int, gameDone *bool) {
+	*passes++
+	fmt.Println("No possible options for player", *curPlayer, ", passing")
+	*curPlayer = 3 - *curPlayer
+
+	if *passes == 2 {
+		*gameDone = true
+		fmt.Println("Game over, determining winner!")
+	}
+}
+
 func DetermineWinner(board [][]int) string {
 	countP1 := 0
 	countP2 := 0
@@ -187,5 +200,16 @@ func DetermineWinner(board [][]int) string {
 		return "player 2"
 	} else {
 		return "draw"
+	}
+}
+
+func HandleMove(y *int, x *int, legalMoveBoard *[][][]Point, curPlayer *int, board *[][]int) {
+	legalMove := ((*legalMoveBoard)[*y][*x] != nil)
+	if legalMove {
+		changes := (*legalMoveBoard)[*y][*x]
+		ChangeBoard(*y, *x, *board, changes, *curPlayer)
+		*curPlayer = 3 - *curPlayer
+	} else {
+		fmt.Println("This (", y, ", ", x, ") is not a legal move")
 	}
 }
