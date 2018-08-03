@@ -8,6 +8,11 @@ import (
 	"baumfalk/reversi/game"
 )
 
+type Point struct {
+    x int
+    y int
+}
+
 
 func getNumberFromIO(scanner * bufio.Scanner, min int, max int) int {
     scanner.Scan()
@@ -22,71 +27,7 @@ func getNumberFromIO(scanner * bufio.Scanner, min int, max int) int {
     return num
 }
 
-
-
-func hor_legal(y int, x int, board [][] string, bluesTurn bool, dir int) bool{
-    otherSymbol := "O"
-    ownSymbol := "X"
-    if !bluesTurn {
-        otherSymbol = "X"
-        ownSymbol = "O"
-    }
-
-    xCur := x + dir
-    if xCur >= len(board[y]) || xCur < 0 {
-        return false
-    }
-    validStreak := false
-    for ; board[y][xCur] == otherSymbol; xCur += dir {
-        if xCur+dir >= len(board[y]) || xCur+dir < 0 {
-            return false
-        }
-        validStreak = true
-    } 
-    return validStreak && board[y][xCur] == ownSymbol
-}
-
-func horizontallyLegal(y int, x int, board [][] string, bluesTurn bool) bool {
-    //left to right
-    //[X]OOOX
-    l2r := hor_legal(y, x, board, bluesTurn, 1)
-    r2l := hor_legal(y, x, board, bluesTurn, -1)
-
-    return l2r || r2l
-}
-
-func ver_legal(y int, x int, board [][] string, bluesTurn bool, dir int) bool{
-    otherSymbol := "O"
-    ownSymbol := "X"
-    if !bluesTurn {
-        otherSymbol = "X"
-        ownSymbol = "O"
-    }
-
-    yCur := y + dir
-    if yCur >= len(board) || yCur < 0 {
-        return false
-    }
-    validStreak := false
-    for ; board[yCur][x] == otherSymbol; yCur += dir {
-        if yCur+dir >= len(board) || yCur +dir< 0 {
-            return false
-        }
-        validStreak = true
-    } 
-    return validStreak && board[yCur][x] == ownSymbol
-}
-
-func verticallyLegal(y int, x int, board [][] string, bluesTurn bool) bool {
-    //left to right
-    //[X]OOOX
-    t2b := ver_legal(y, x, board, bluesTurn, 1)
-    b2t := ver_legal(y, x, board, bluesTurn, -1)
-
-    return t2b || b2t
-}
-
-func diag_legal(y int, x int, board [][] string, bluesTurn bool, dir_y int, dir_x int) bool{
+func checkLegalMove(y int, x int, board [][] string, bluesTurn bool, dir_y int, dir_x int) (bool, [] Point) {
     otherSymbol := "O"
     ownSymbol := "X"
     if !bluesTurn {
@@ -96,36 +37,55 @@ func diag_legal(y int, x int, board [][] string, bluesTurn bool, dir_y int, dir_
 
     yCur := y + dir_y
     if yCur >= len(board) || yCur < 0 {
-        return false
+        return false, nil
     }
 
     xCur := x + dir_x
     if xCur >= len(board[y]) || xCur < 0 {
-        return false
+        return false, nil
     }
 
     validStreak := false
+    var list []Point
     for ; board[yCur][xCur] == otherSymbol; yCur, xCur = yCur + dir_y, xCur + dir_x {
         validStreak = true
+        
         if yCur+dir_y >= len(board) || yCur+dir_y < 0 {
-            return false
+            return false, nil
         }
         if xCur+dir_x >= len(board[yCur]) || xCur+dir_x < 0 {
-            return false
+            return false, nil
         }
+        list = append(list,Point{y:yCur, x:xCur })
     } 
-    return validStreak && board[yCur][xCur] == ownSymbol
+    valid := validStreak && board[yCur][xCur] == ownSymbol
+    if !valid {
+        list = nil
+    }
+    return valid, list
 }
 
-func diagonallyLegal(y int, x int, board [][] string, bluesTurn bool) bool {
-    //left to right
-    //[X]OOOX
-    t2bl2r := diag_legal(y, x, board, bluesTurn, -1, 1)
-    t2br2l := diag_legal(y, x, board, bluesTurn, -1, -1)
-    b2tl2r := diag_legal(y, x, board, bluesTurn, 1, 1)
-    b2tr2l := diag_legal(y, x, board, bluesTurn, 1, -1)
+func horizontallyLegal(y int, x int, board [][] string, bluesTurn bool) (bool,[]Point) {
+    l2r, l1 := checkLegalMove(y, x, board, bluesTurn, 0, 1)
+    r2l, l2 := checkLegalMove(y, x, board, bluesTurn, 0, -1)
 
-    return t2bl2r || t2br2l || b2tl2r || b2tr2l
+    return l2r || r2l, append(l1,l2...)
+}
+func verticallyLegal(y int, x int, board [][] string, bluesTurn bool) (bool,[]Point) {
+    t2b, l1 := checkLegalMove(y, x, board, bluesTurn, 1, 0)
+    b2t, l2 := checkLegalMove(y, x, board, bluesTurn, -1, 0)
+
+    return t2b || b2t, append(l1,l2...)
+}
+
+func diagonallyLegal(y int, x int, board [][] string, bluesTurn bool) (bool,[]Point) {
+    t2bl2r, l1 := checkLegalMove(y, x, board, bluesTurn, -1, 1)
+    t2br2l, l2 := checkLegalMove(y, x, board, bluesTurn, -1, -1)
+    b2tl2r, l3 := checkLegalMove(y, x, board, bluesTurn, 1, 1)
+    b2tr2l, l4 := checkLegalMove(y, x, board, bluesTurn, 1, -1)
+
+    totalList := append(append(l1,l2...),append(l3,l4...)...)
+    return t2bl2r || t2br2l || b2tl2r || b2tr2l, totalList
 }
 
 
@@ -136,7 +96,7 @@ func generateLegalMoves(board [][] string, bluesTurn bool) ([][] bool, int) {
         legalMoveBoard[y] = make([]bool, len(board[y]), len(board[y])) 
 
         for x, _ := range row {
-            legalMoveBoard[y][x], _ = isLegalMove(y, x, board, bluesTurn)
+            legalMoveBoard[y][x], _, _ = isLegalMove(y, x, board, bluesTurn)
             if legalMoveBoard[y][x] {
                 legalMoveCount++
             }
@@ -145,21 +105,21 @@ func generateLegalMoves(board [][] string, bluesTurn bool) ([][] bool, int) {
     return legalMoveBoard, legalMoveCount
 }
 
-func isLegalMove(y int, x int, board [][]string, bluesTurn bool) (bool, string) {
+func isLegalMove(y int, x int, board [][]string, bluesTurn bool) (bool, string, [] Point) {
     outOfBounds := y < 0 || y >= len(board) || x <0 || x >= len(board[y])
     if outOfBounds {
-        return false, "Out of bounds"
+        return false, "Out of bounds", nil
     }
     cellIsOccupied := board[y][x] != " "
     if cellIsOccupied || outOfBounds{
-        return false, "Cell is occupied"
+        return false, "Cell is occupied", nil
     }
 
-    h := horizontallyLegal(y, x, board, bluesTurn)
-    v := verticallyLegal(y, x, board, bluesTurn)
-    d := diagonallyLegal(y, x, board, bluesTurn)
-
-    return h || v || d, "no streak"
+    h, l1 := horizontallyLegal(y, x, board, bluesTurn)
+    v, l2 := verticallyLegal(y, x, board, bluesTurn)
+    d, l3 := diagonallyLegal(y, x, board, bluesTurn)
+    totalList := append(append(l1,l2...),l3...)
+    return h || v || d, "no streak", totalList
 }
 
 func getCoordinates(scanner * bufio.Scanner, boardSize int) (y int, x int) {
@@ -178,60 +138,73 @@ func printInfo(bluesTurn bool) {
     }
 }
 
-func changeBoard(y int, x int, board [][]string, bluesTurn bool) {
-    otherSymbol := "O"
+func changeBoard(y int, x int, board [][]string, changedCells [] Point, bluesTurn bool) {
     ownSymbol := "X"
     if !bluesTurn {
-        otherSymbol = "X"
         ownSymbol = "O"
     }
-    if horizontallyLegal(y, x, board, bluesTurn) {
-        dir := 1
-        if hor_legal(y, x, board, bluesTurn, -1) {
-            dir = -1
-        } 
-        xCur := x + dir
-        stillCool := board[y][xCur] == otherSymbol
-        for ; stillCool; xCur += dir {
-            stillCool = board[y][xCur] == otherSymbol
-            board[y][xCur] = ownSymbol 
-        }
-    } 
-    if verticallyLegal(y, x, board, bluesTurn) {
-        dir := 1
-        if ver_legal(y, x, board, bluesTurn, -1) {
-            dir = -1
-        } 
-        yCur := y + dir
-        stillCool := board[yCur][x] == otherSymbol
-        for ; stillCool; yCur += dir {
-            stillCool = board[yCur][x] == otherSymbol
-            board[yCur][x] = ownSymbol 
-        }
-    } 
-    if diagonallyLegal(y, x, board, bluesTurn) {
-        y_dir := 1
-        x_dir := 1
-        if diag_legal(y, x, board, bluesTurn, -1, -1) {
-            y_dir = -1
-            x_dir = -1
-        } else if diag_legal(y, x, board, bluesTurn, 1, -1) {
-            x_dir = -1
-        } else if diag_legal(y, x, board, bluesTurn, -1, 1) {
-            y_dir = -1
-        }
 
-        yCur := y + y_dir
-        xCur := x + x_dir
-        stillCool := board[yCur][xCur] == otherSymbol
-        for ; stillCool; yCur, xCur = yCur + y_dir, xCur + x_dir {
-            stillCool = board[yCur][xCur] == otherSymbol
-            board[yCur][xCur] = ownSymbol 
-        }
+    for _, pt := range changedCells {
+        board[pt.y][pt.x] = ownSymbol
     }
+        board[y][x] = ownSymbol
 
-    board[y][x] = ownSymbol
 }
+
+// func changeBoard(y int, x int, board [][]string, bluesTurn bool) {
+//     otherSymbol := "O"
+//     ownSymbol := "X"
+//     if !bluesTurn {
+//         otherSymbol = "X"
+//         ownSymbol = "O"
+//     }
+//     if horizontallyLegal(y, x, board, bluesTurn) {
+//         dir := 1
+//         if checkLegalMove(y, x, board, bluesTurn, 0, -1) {
+//             dir = -1
+//         } 
+//         xCur := x + dir
+//         stillCool := board[y][xCur] == otherSymbol
+//         for ; stillCool; xCur += dir {
+//             stillCool = board[y][xCur] == otherSymbol
+//             board[y][xCur] = ownSymbol 
+//         }
+//     } 
+//     if verticallyLegal(y, x, board, bluesTurn) {
+//         dir := 1
+//         if checkLegalMove(y, x, board, bluesTurn, -1, 0) {
+//             dir = -1
+//         } 
+//         yCur := y + dir
+//         stillCool := board[yCur][x] == otherSymbol
+//         for ; stillCool; yCur += dir {
+//             stillCool = board[yCur][x] == otherSymbol
+//             board[yCur][x] = ownSymbol 
+//         }
+//     } 
+//     if diagonallyLegal(y, x, board, bluesTurn) {
+//         y_dir := 1
+//         x_dir := 1
+//         if checkLegalMove(y, x, board, bluesTurn, -1, -1) {
+//             y_dir = -1
+//             x_dir = -1
+//         } else if checkLegalMove(y, x, board, bluesTurn, 1, -1) {
+//             x_dir = -1
+//         } else if checkLegalMove(y, x, board, bluesTurn, -1, 1) {
+//             y_dir = -1
+//         }
+
+//         yCur := y + y_dir
+//         xCur := x + x_dir
+//         stillCool := board[yCur][xCur] == otherSymbol
+//         for ; stillCool; yCur, xCur = yCur + y_dir, xCur + x_dir {
+//             stillCool = board[yCur][xCur] == otherSymbol
+//             board[yCur][xCur] = ownSymbol 
+//         }
+//     }
+
+//     board[y][x] = ownSymbol
+// }
 
 func determineWinner(board [][]string) string {
     countX := 0
@@ -280,10 +253,10 @@ func main() {
         game.PrintBoard(board, legalMoveBoard)
         printInfo(bluesTurn)               
         y, x := getCoordinates(scanner, boardSize)
-        legalMove, reason := isLegalMove(y,x,board, bluesTurn)
+        legalMove, reason, changes := isLegalMove(y,x,board, bluesTurn)
 
         if legalMove {
-            changeBoard(y,x,board, bluesTurn)    
+            changeBoard(y,x,board, changes, bluesTurn)    
             bluesTurn = !bluesTurn
         } else {
             fmt.Println("This (", y,", ", x, ") is not a legal move:", reason)
