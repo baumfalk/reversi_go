@@ -73,94 +73,100 @@ func PrintBoard(board [][]int, legalMoveBoard [][][]Point) {
 	}
 }
 
-func checkLegalMoveHelper(y int, x int, board [][]int, curPlayer int, dirY int, dirX int) (bool, []Point) {
+func posIsOutOfBounds(yPos int, yLength int, xPos int, xLength int) bool {
+	return yPos >= yLength || yPos < 0 || xPos >= xLength || xPos < 0
+}
+
+func checkLegalMoveHelper(y int, x int, board [][]int, curPlayer int, dirY int, dirX int) []Point {
 	otherPlayer := 3 - curPlayer
-
 	yCur := y + dirY
-	if yCur >= len(board) || yCur < 0 {
-		return false, nil
-	}
-
 	xCur := x + dirX
-	if xCur >= len(board[y]) || xCur < 0 {
-		return false, nil
+	var list []Point
+	var validStreak bool
+
+	if posIsOutOfBounds(yCur, len(board), xCur, len(board[y])) {
+		return nil
 	}
 
-	validStreak := false
-	var list []Point
-	for ; board[yCur][xCur] == otherPlayer; yCur, xCur = yCur+dirY, xCur+dirX {
+	for board[yCur][xCur] == otherPlayer {
 		validStreak = true
-
-		if yCur+dirY >= len(board) || yCur+dirY < 0 || xCur+dirX >= len(board[yCur]) || xCur+dirX < 0 {
-			validStreak = false
-			break
+		if posIsOutOfBounds(yCur+dirY, len(board), xCur+dirX, len(board[yCur])) {
+			return nil
 		}
 		list = append(list, Point{y: yCur, x: xCur})
+		yCur, xCur = yCur+dirY, xCur+dirX
 	}
-	valid := validStreak && board[yCur][xCur] == curPlayer
-	if !valid {
+	validStreak = validStreak && board[yCur][xCur] == curPlayer
+
+	if !validStreak {
 		list = nil
 	}
-	return valid, list
+	return list
 }
 
-func horizontallyLegal(y int, x int, board [][]int, curPlayer int) (bool, []Point) {
-	l2r, l1 := checkLegalMoveHelper(y, x, board, curPlayer, 0, 1)
-	r2l, l2 := checkLegalMoveHelper(y, x, board, curPlayer, 0, -1)
+func horizontallyLegal(y int, x int, board [][]int, curPlayer int, ch chan []Point) {
+	l2r := checkLegalMoveHelper(y, x, board, curPlayer, 0, 1)
+	r2l := checkLegalMoveHelper(y, x, board, curPlayer, 0, -1)
 
-	return l2r || r2l, append(l1, l2...)
+	ch <- append(l2r, r2l...)
 }
-func verticallyLegal(y int, x int, board [][]int, curPlayer int) (bool, []Point) {
-	t2b, l1 := checkLegalMoveHelper(y, x, board, curPlayer, 1, 0)
-	b2t, l2 := checkLegalMoveHelper(y, x, board, curPlayer, -1, 0)
+func verticallyLegal(y int, x int, board [][]int, curPlayer int, ch chan []Point) {
+	t2b := checkLegalMoveHelper(y, x, board, curPlayer, 1, 0)
+	b2t := checkLegalMoveHelper(y, x, board, curPlayer, -1, 0)
 
-	return t2b || b2t, append(l1, l2...)
+	ch <- append(t2b, b2t...)
 }
 
-func diagonallyLegal(y int, x int, board [][]int, curPlayer int) (bool, []Point) {
-	t2bl2r, l1 := checkLegalMoveHelper(y, x, board, curPlayer, -1, 1)
-	t2br2l, l2 := checkLegalMoveHelper(y, x, board, curPlayer, -1, -1)
-	b2tl2r, l3 := checkLegalMoveHelper(y, x, board, curPlayer, 1, 1)
-	b2tr2l, l4 := checkLegalMoveHelper(y, x, board, curPlayer, 1, -1)
+func diagonallyLegal(y int, x int, board [][]int, curPlayer int, ch chan []Point) {
+	t2bl2r := checkLegalMoveHelper(y, x, board, curPlayer, -1, 1)
+	t2br2l := checkLegalMoveHelper(y, x, board, curPlayer, -1, -1)
+	b2tl2r := checkLegalMoveHelper(y, x, board, curPlayer, 1, 1)
+	b2tr2l := checkLegalMoveHelper(y, x, board, curPlayer, 1, -1)
 
-	totalList := append(append(l1, l2...), append(l3, l4...)...)
-	return t2bl2r || t2br2l || b2tl2r || b2tr2l, totalList
+	totalList := append(append(t2bl2r, t2br2l...), append(b2tl2r, b2tr2l...)...)
+	ch <- totalList
 }
 
 func GenerateLegalMoves(board [][]int, curPlayer int) ([][][]Point, int) {
 	legalMoveBoard := make([][][]Point, len(board), len(board))
-
 	legalMoveCount := 0
 
 	for y, row := range board {
 		legalMoveBoard[y] = make([][]Point, len(board[y]), len(board[y]))
 
 		for x := range row {
-			legal, _, changes := IsLegalMove(y, x, board, curPlayer)
-			legalMoveBoard[y][x] = changes
-			if legal {
+			moveResult, _ := IsLegalMove(y, x, board, curPlayer)
+			legalMoveBoard[y][x] = moveResult
+			if moveResult != nil {
 				legalMoveCount++
 			}
 		}
 	}
+
 	return legalMoveBoard, legalMoveCount
 }
 
-func IsLegalMove(y int, x int, board [][]int, curPlayer int) (bool, string, []Point) {
+func IsLegalMove(y int, x int, board [][]int, curPlayer int) ([]Point, string) {
 	outOfBounds := y < 0 || y >= len(board) || x < 0 || x >= len(board[y])
 	if outOfBounds {
-		return false, "Out of bounds", nil
+		return nil, "Out of bounds"
 	}
 	cellIsOccupied := board[y][x] != 0
-	if cellIsOccupied || outOfBounds {
-		return false, "Cell is occupied", nil
+	if cellIsOccupied {
+		return nil, "Cell is occupied"
 	}
 
-	h, l1 := horizontallyLegal(y, x, board, curPlayer)
-	v, l2 := verticallyLegal(y, x, board, curPlayer)
-	d, l3 := diagonallyLegal(y, x, board, curPlayer)
-	totalList := append(append(l1, l2...), l3...)
-	return h || v || d, "no streak", totalList
+	ch1, ch2, ch3 := make(chan []Point), make(chan []Point), make(chan []Point)
+
+	go horizontallyLegal(y, x, board, curPlayer, ch1)
+	go verticallyLegal(y, x, board, curPlayer, ch2)
+	go diagonallyLegal(y, x, board, curPlayer, ch3)
+
+	h, v, d := <-ch1, <-ch2, <-ch3
+
+	totalList := append(append(h, v...), d...)
+
+	return totalList, "no streak"
 }
 
 func ChangeBoard(y int, x int, board [][]int, changedCells []Point, curPlayer int) {
@@ -210,6 +216,6 @@ func HandleMove(y *int, x *int, legalMoveBoard *[][][]Point, curPlayer *int, boa
 		ChangeBoard(*y, *x, *board, changes, *curPlayer)
 		*curPlayer = 3 - *curPlayer
 	} else {
-		fmt.Println("This (", y, ", ", x, ") is not a legal move")
+		fmt.Println("This (", *y, ", ", *x, ") is not a legal move")
 	}
 }
